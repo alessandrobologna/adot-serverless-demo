@@ -1,0 +1,15 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /jobs/{jobId}",
+  "rawPath": "/jobs/demo-job-id",
+  "pathParameters": {
+    "jobId": "demo-job-id"
+  },
+  "requestContext": {
+    "http": {
+      "method": "GET",
+      "path": "/jobs/demo-job-id"
+    }
+  },
+  "isBase64Encoded": false
+}

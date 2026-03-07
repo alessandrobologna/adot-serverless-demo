@@ -1,0 +1,14 @@
+.aws-sam/
+.vs
+.vscode/
+.waylog
+
+.DS_Store
+.pytest_cache/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+src/node-api/node_modules/
+
+src/node-api/package-lock.json

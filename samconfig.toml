@@ -1,0 +1,17 @@
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "adot-serverless-demo"
+resolve_s3 = true
+s3_prefix = "adot-serverless-demo"
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = [
+    "SlowModeDelaySeconds=6",
+    "NodeAdotLayerArn=arn:aws:lambda:us-east-1:615299751070:layer:AWSOpenTelemetryDistroJs:12",
+    "PythonAdotLayerArn=arn:aws:lambda:us-east-1:615299751070:layer:AWSOpenTelemetryDistroPython:24",
+]
+image_repositories = []
+
+[default.global.parameters]
+region = "us-east-1"

@@ -1,0 +1,17 @@
+{
+  "name": "adot-serverless-demo-api",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "NODE_PATH=./node_modules node --test ../../tests/node/*.test.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.884.0",
+    "@aws-sdk/client-sqs": "^3.884.0",
+    "@aws-sdk/lib-dynamodb": "^3.884.0"
+  }
+}
