@@ -28,7 +28,7 @@ sam deploy --guided
 <div align="center">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./svgs/readme-1-dark.svg">
-  <img src="./svgs/readme-1-light.svg" alt="Architecture diagram" height="346">
+  <img src="./svgs/readme-1-light.svg" alt="Architecture diagram" height="417">
 </picture>
 </div>
 
@@ -38,10 +38,13 @@ sam deploy --guided
 ```mermaid
 ---
 config:
+  theme: base
   look: handDrawn
+  themeVariables:
+    lineColor: "#7d8593"
   architecture:
-    iconSize: 48
-    padding: 40
+    iconSize: 64
+    padding: 48
     fontSize: 16
 ---
 architecture-beta
