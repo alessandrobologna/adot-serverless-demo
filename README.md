@@ -23,6 +23,10 @@ sam deploy --guided
 - [AWS Distro for OpenTelemetry Lambda Support For JavaScript](https://aws-otel.github.io/docs/getting-started/lambda/lambda-js/)
 - [AWS::ApplicationSignals::Discovery](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-applicationsignals-discovery.html)
 
+## Additional Guides
+
+- [Use your own OTLP backend](docs/use-your-own-otlp-backend.md)
+
 ## Architecture
 
 <div align="center">
