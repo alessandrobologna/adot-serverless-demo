@@ -6,6 +6,17 @@ Description: >
   and S3.
 
 Parameters:
+  ManageApplicationSignalsDiscovery:
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: >
+      Set to true only when this stack should create the account-level
+      AWS::ApplicationSignals::Discovery resource. Leave false if Application
+      Signals is already enabled in this account and Region or managed by
+      another stack.
   SlowModeDelaySeconds:
     Type: Number
     Default: 6
@@ -20,6 +31,11 @@ Parameters:
     Type: String
     Default: arn:aws:lambda:us-east-1:615299751070:layer:AWSOpenTelemetryDistroPython:24
     Description: ADOT Lambda layer ARN for the Python functions.
+
+Conditions:
+  CreateApplicationSignalsDiscovery: !Equals
+    - !Ref ManageApplicationSignalsDiscovery
+    - "true"
 
 Globals:
   Function:
@@ -36,6 +52,7 @@ Globals:
 Resources:
   ApplicationSignalsDiscovery:
     Type: AWS::ApplicationSignals::Discovery
+    Condition: CreateApplicationSignalsDiscovery
 
   DemoHttpApi:
     Type: AWS::Serverless::HttpApi
@@ -91,7 +108,7 @@ Resources:
   SubmitJobFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/node-api/
+      CodeUri: ../../src/node-api/
       FunctionName: !Sub "${AWS::StackName}-submit-job"
       Handler: submit-job/app.handler
       Layers:
@@ -120,7 +137,7 @@ Resources:
   GetJobFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/node-api/
+      CodeUri: ../../src/node-api/
       FunctionName: !Sub "${AWS::StackName}-get-job"
       Handler: get-job/app.handler
       Layers:
@@ -146,7 +163,7 @@ Resources:
   ProcessJobFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/python-workers/
+      CodeUri: ../../src/python-workers/
       FunctionName: !Sub "${AWS::StackName}-process-job"
       Handler: process_job.app.handler
       Layers:
@@ -176,7 +193,7 @@ Resources:
   IndexArtifactFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/python-workers/
+      CodeUri: ../../src/python-workers/
       FunctionName: !Sub "${AWS::StackName}-index-artifact"
       Handler: index_artifact.app.handler
       Layers:

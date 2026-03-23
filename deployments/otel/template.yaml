@@ -1,0 +1,238 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Demo SAM application that uses ADOT-instrumented Lambda services with direct
+  OTLP trace export to a third-party OpenTelemetry backend across HTTP and
+  event-driven flows backed by DynamoDB, SQS, and S3.
+
+Parameters:
+  SlowModeDelaySeconds:
+    Type: Number
+    Default: 6
+    MinValue: 1
+    MaxValue: 30
+    Description: Delay used by the demo worker when a job is submitted with mode=slow.
+  NodeAdotLayerArn:
+    Type: String
+    Default: arn:aws:lambda:us-east-1:615299751070:layer:AWSOpenTelemetryDistroJs:12
+    Description: ADOT Lambda layer ARN for the Node.js functions.
+  PythonAdotLayerArn:
+    Type: String
+    Default: arn:aws:lambda:us-east-1:615299751070:layer:AWSOpenTelemetryDistroPython:24
+    Description: ADOT Lambda layer ARN for the Python functions.
+  OtelBackendSecretName:
+    Type: String
+    Default: adot-serverless-demo-otel-backend
+    Description: >
+      Name or ARN of the Secrets Manager secret whose SecretString JSON contains
+      endpoint and auth keys for the third-party OTel backend. An optional name
+      key may also be present for operator metadata.
+  OtelBackendConfigVersion:
+    Type: String
+    Default: "2026-03-19-1"
+    Description: >
+      Bump this value whenever the backend secret changes so CloudFormation
+      re-resolves the secret-backed Lambda environment variables.
+
+Globals:
+  Function:
+    Architectures:
+      - arm64
+    MemorySize: 256
+    Timeout: 10
+    Environment:
+      Variables:
+        AWS_LAMBDA_EXEC_WRAPPER: /opt/otel-instrument
+        JOBS_TABLE_NAME: !Ref JobsTable
+        OTEL_AWS_APPLICATION_SIGNALS_ENABLED: "false"
+        OTEL_BACKEND_CONFIG_VERSION: !Ref OtelBackendConfigVersion
+        OTEL_PROPAGATORS: tracecontext
+        OTEL_TRACES_EXPORTER: otlp
+        OTEL_TRACES_SAMPLER: always_on
+        OTEL_EXPORTER_OTLP_TRACES_PROTOCOL: http/protobuf
+        OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: !Sub "{{resolve:secretsmanager:${OtelBackendSecretName}:SecretString:endpoint}}v1/traces"
+        OTEL_EXPORTER_OTLP_TRACES_HEADERS: !Sub "{{resolve:secretsmanager:${OtelBackendSecretName}:SecretString:auth}}"
+
+Resources:
+  DemoHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Name: !Sub "${AWS::StackName}-http-api"
+      StageName: $default
+      CorsConfiguration:
+        AllowHeaders:
+          - content-type
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        AllowOrigins:
+          - "*"
+
+  JobsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      TableName: !Sub "${AWS::StackName}-jobs"
+      AttributeDefinitions:
+        - AttributeName: jobId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: jobId
+          KeyType: HASH
+
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-artifacts"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  WorkDlq:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${AWS::StackName}-work-dlq"
+
+  WorkQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${AWS::StackName}-work-queue"
+      VisibilityTimeout: 20
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt WorkDlq.Arn
+        maxReceiveCount: 1
+
+  SubmitJobFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../src/node-api/
+      FunctionName: !Sub "${AWS::StackName}-submit-job"
+      Handler: submit-job/app.handler
+      Layers:
+        - !Ref NodeAdotLayerArn
+      Runtime: nodejs22.x
+      Environment:
+        Variables:
+          OTEL_SERVICE_NAME: demo-api
+          WORK_QUEUE_URL: !Ref WorkQueue
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - DynamoDBCrudPolicy:
+            TableName: !Ref JobsTable
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt WorkQueue.QueueName
+      Events:
+        SubmitJob:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DemoHttpApi
+            Method: POST
+            Path: /jobs
+
+  GetJobFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../src/node-api/
+      FunctionName: !Sub "${AWS::StackName}-get-job"
+      Handler: get-job/app.handler
+      Layers:
+        - !Ref NodeAdotLayerArn
+      Runtime: nodejs22.x
+      Environment:
+        Variables:
+          OTEL_SERVICE_NAME: demo-api
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - DynamoDBReadPolicy:
+            TableName: !Ref JobsTable
+      Events:
+        GetJob:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DemoHttpApi
+            Method: GET
+            Path: /jobs/{jobId}
+
+  ProcessJobFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../src/python-workers/
+      FunctionName: !Sub "${AWS::StackName}-process-job"
+      Handler: process_job.app.handler
+      Layers:
+        - !Ref PythonAdotLayerArn
+      Runtime: python3.13
+      Timeout: 15
+      Environment:
+        Variables:
+          ARTIFACTS_BUCKET_NAME: !Sub "${AWS::StackName}-artifacts"
+          DEMO_SLOW_DELAY_SECONDS: !Ref SlowModeDelaySeconds
+          OTEL_SERVICE_NAME: demo-worker
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - DynamoDBCrudPolicy:
+            TableName: !Ref JobsTable
+        - S3WritePolicy:
+            BucketName: !Sub "${AWS::StackName}-artifacts"
+      Events:
+        WorkQueueEvent:
+          Type: SQS
+          Properties:
+            BatchSize: 1
+            Queue: !GetAtt WorkQueue.Arn
+
+  IndexArtifactFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../src/python-workers/
+      FunctionName: !Sub "${AWS::StackName}-index-artifact"
+      Handler: index_artifact.app.handler
+      Layers:
+        - !Ref PythonAdotLayerArn
+      Runtime: python3.13
+      Environment:
+        Variables:
+          OTEL_SERVICE_NAME: demo-indexer
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - DynamoDBCrudPolicy:
+            TableName: !Ref JobsTable
+        - S3ReadPolicy:
+            BucketName: !Sub "${AWS::StackName}-artifacts"
+      Events:
+        ArtifactCreated:
+          Type: S3
+          Properties:
+            Bucket: !Ref ArtifactsBucket
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: artifacts/
+                  - Name: suffix
+                    Value: .json
+
+Outputs:
+  ApiBaseUrl:
+    Description: Base URL for the public HTTP API.
+    Value: !Sub https://${DemoHttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}
+
+  ArtifactsBucketName:
+    Description: Bucket that stores generated artifacts.
+    Value: !Ref ArtifactsBucket
+
+  JobsTableName:
+    Description: DynamoDB table that stores job state.
+    Value: !Ref JobsTable
+
+  WorkDlqUrl:
+    Description: Dead-letter queue URL for failed worker messages.
+    Value: !Ref WorkDlq
+
+  WorkQueueUrl:
+    Description: Queue URL used by the submit API and worker.
+    Value: !Ref WorkQueue

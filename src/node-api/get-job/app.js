@@ -1,5 +1,6 @@
 "use strict";
 
+const { trace } = require("@opentelemetry/api");
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const {
   DynamoDBDocumentClient,
@@ -9,6 +10,13 @@ const {
 const ddbClient = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
   marshallOptions: { removeUndefinedValues: true },
 });
+
+function addSpanEvent(name, attributes = {}) {
+  const span = trace.getActiveSpan();
+  if (span) {
+    span.addEvent(name, attributes);
+  }
+}
 
 function response(statusCode, body) {
   return {
@@ -23,6 +31,7 @@ function response(statusCode, body) {
 exports.handler = async (event) => {
   const jobId = event.pathParameters?.jobId;
   if (!jobId) {
+    addSpanEvent("demo.job.lookup.invalid_request");
     return response(400, {
       message: "jobId is required.",
     });
@@ -36,10 +45,18 @@ exports.handler = async (event) => {
   );
 
   if (!result.Item) {
+    addSpanEvent("demo.job.lookup.miss", {
+      jobId,
+    });
     return response(404, {
       message: `Job ${jobId} was not found.`,
     });
   }
+
+  addSpanEvent("demo.job.lookup.hit", {
+    jobId,
+    status: String(result.Item.status ?? "UNKNOWN"),
+  });
 
   return response(200, result.Item);
 };

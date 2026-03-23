@@ -42,13 +42,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--template",
-        default="template.yaml",
-        help="Path to the SAM template to inspect. Default: template.yaml",
+        default="deployments/appsignals/template.yaml",
+        help="Path to the SAM template to inspect. Default: deployments/appsignals/template.yaml",
     )
     parser.add_argument(
         "--samconfig",
-        default="samconfig.toml",
-        help="Path to the samconfig file to inspect and update when present. Default: samconfig.toml",
+        default="deployments/appsignals/samconfig.toml",
+        help="Path to the samconfig file to inspect and update when present. Default: deployments/appsignals/samconfig.toml",
     )
     parser.add_argument(
         "--region",

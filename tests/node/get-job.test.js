@@ -2,6 +2,7 @@
 
 const assert = require("node:assert/strict");
 const { afterEach, test, mock } = require("node:test");
+const { trace } = require("@opentelemetry/api");
 const { DynamoDBDocumentClient, GetCommand } = require("@aws-sdk/lib-dynamodb");
 
 const getJob = require("../../src/node-api/get-job/app");
@@ -13,6 +14,7 @@ afterEach(() => {
 
 test("GET /jobs/{jobId} returns the stored item", async () => {
   process.env.JOBS_TABLE_NAME = "jobs-table";
+  const events = [];
 
   mock.method(DynamoDBDocumentClient.prototype, "send", async (command) => {
     assert.ok(command instanceof GetCommand);
@@ -25,6 +27,11 @@ test("GET /jobs/{jobId} returns the stored item", async () => {
       },
     };
   });
+  mock.method(trace, "getActiveSpan", () => ({
+    addEvent(name, attributes) {
+      events.push({ attributes, name });
+    },
+  }));
 
   const response = await getJob.handler({
     pathParameters: { jobId: "job-123" },
@@ -35,10 +42,25 @@ test("GET /jobs/{jobId} returns the stored item", async () => {
     jobId: "job-123",
     status: "COMPLETED",
   });
+  assert.deepEqual(events, [
+    {
+      name: "demo.job.lookup.hit",
+      attributes: {
+        jobId: "job-123",
+        status: "COMPLETED",
+      },
+    },
+  ]);
 });
 
 test("GET /jobs/{jobId} returns 404 when the item is missing", async () => {
+  const events = [];
   mock.method(DynamoDBDocumentClient.prototype, "send", async () => ({ Item: null }));
+  mock.method(trace, "getActiveSpan", () => ({
+    addEvent(name, attributes) {
+      events.push({ attributes, name });
+    },
+  }));
 
   const response = await getJob.handler({
     pathParameters: { jobId: "missing-job" },
@@ -46,4 +68,12 @@ test("GET /jobs/{jobId} returns 404 when the item is missing", async () => {
 
   assert.equal(response.statusCode, 404);
   assert.match(response.body, /missing-job/);
+  assert.deepEqual(events, [
+    {
+      name: "demo.job.lookup.miss",
+      attributes: {
+        jobId: "missing-job",
+      },
+    },
+  ]);
 });

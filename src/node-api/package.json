@@ -10,6 +10,7 @@
     "test": "NODE_PATH=./node_modules node --test ../../tests/node/*.test.js"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
     "@aws-sdk/client-dynamodb": "^3.884.0",
     "@aws-sdk/client-sqs": "^3.884.0",
     "@aws-sdk/lib-dynamodb": "^3.884.0"

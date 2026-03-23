@@ -32,6 +32,14 @@ class FakeS3Client:
         }
 
 
+class FakeSpan:
+    def __init__(self):
+        self.events = []
+
+    def add_event(self, name, attributes):
+        self.events.append({"name": name, "attributes": attributes})
+
+
 def load_index_artifact_module():
     fake_table = FakeTable()
     fake_s3 = FakeS3Client()
@@ -60,6 +68,8 @@ def load_index_artifact_module():
 class IndexArtifactTests(unittest.TestCase):
     def test_indexer_updates_table_from_s3_metadata(self):
         module, table, s3_client = load_index_artifact_module()
+        span = FakeSpan()
+        module.trace = types.SimpleNamespace(get_current_span=lambda: span)
 
         result = module.handler(
             {
@@ -80,6 +90,14 @@ class IndexArtifactTests(unittest.TestCase):
         self.assertEqual(s3_client.heads[0]["Key"], "artifacts/job-123.json")
         self.assertEqual(table.updates[0]["Key"]["jobId"], "job-123")
         self.assertEqual(table.updates[0]["ExpressionAttributeValues"][":artifactSize"], 128)
+        self.assertEqual(
+            [event["name"] for event in span.events],
+            [
+                "demo.artifact.indexing.started",
+                "demo.artifact.metadata.loaded",
+                "demo.artifact.indexed",
+            ],
+        )
 
 
 if __name__ == "__main__":

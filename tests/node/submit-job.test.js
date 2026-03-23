@@ -2,6 +2,7 @@
 
 const assert = require("node:assert/strict");
 const { afterEach, test, mock } = require("node:test");
+const { trace } = require("@opentelemetry/api");
 const { DynamoDBDocumentClient, PutCommand } = require("@aws-sdk/lib-dynamodb");
 const { SQSClient, SendMessageCommand } = require("@aws-sdk/client-sqs");
 
@@ -18,6 +19,7 @@ test("POST /jobs queues work and persists the job", async () => {
   process.env.WORK_QUEUE_URL = "https://sqs.us-east-1.amazonaws.com/123/demo";
 
   const commands = [];
+  const events = [];
   mock.method(DynamoDBDocumentClient.prototype, "send", async (command) => {
     commands.push(command);
     return {};
@@ -26,6 +28,11 @@ test("POST /jobs queues work and persists the job", async () => {
     commands.push(command);
     return { MessageId: "message-1" };
   });
+  mock.method(trace, "getActiveSpan", () => ({
+    addEvent(name, attributes) {
+      events.push({ attributes, name });
+    },
+  }));
 
   const response = await submitJob.handler({
     body: JSON.stringify({ mode: "ok", payload: { orderId: "1234" } }),
@@ -50,6 +57,16 @@ test("POST /jobs queues work and persists the job", async () => {
   assert.ok(sendCommand);
   assert.equal(sendCommand.input.QueueUrl, process.env.WORK_QUEUE_URL);
   assert.equal(JSON.parse(sendCommand.input.MessageBody).jobId, body.jobId);
+
+  assert.deepEqual(
+    events.map((event) => event.name),
+    [
+      "demo.job.request.accepted",
+      "demo.job.persisted",
+      "demo.job.enqueued",
+    ],
+  );
+  assert.equal(events[0].attributes.jobId, body.jobId);
 });
 
 test("POST /jobs rejects invalid JSON", async () => {
