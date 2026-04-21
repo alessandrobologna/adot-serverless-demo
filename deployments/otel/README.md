@@ -11,11 +11,10 @@ This deployment configuration keeps:
 - optimized ADOT Lambda layers for Node.js 22 and Python 3.13
 - `AWS_LAMBDA_EXEC_WRAPPER=/opt/otel-instrument`
 - the shared Lambda handlers, event sources, and stack outputs
-- the current `OTEL_SERVICE_NAME` values
+- function-scoped `OTEL_SERVICE_NAME` values that match each Lambda function name
 
 This deployment configuration removes:
 
-- `AWS::ApplicationSignals::Discovery`
 - `CloudWatchLambdaApplicationSignalsExecutionRolePolicy`
 - `AWSXRayDaemonWriteAccess`
 - `Tracing: Active`
@@ -170,6 +169,12 @@ Run the shared smoke test with this deployment configuration's stack name:
 
 ```bash
 ./scripts/smoke-test.sh adot-serverless-demo-otel
+```
+
+To generate a larger set of successful traces for the external backend while still verifying the full API -> SQS -> S3 -> indexer path:
+
+```bash
+./scripts/smoke-test.sh adot-serverless-demo-otel us-east-1 --modes ok --count 100
 ```
 
 ## References

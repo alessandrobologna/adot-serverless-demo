@@ -85,7 +85,7 @@ architecture-beta
 
 Each Lambda function is instrumented with ADOT and sends telemetry to CloudWatch Application Signals through:
 
-- an account-level `AWS::ApplicationSignals::Discovery` resource
+- a one-time Application Signals enablement step in the target account and Region
 - `CloudWatchLambdaApplicationSignalsExecutionRolePolicy`
 - `AWSXRayDaemonWriteAccess`
 - The runtime-specific AWS Distro for OpenTelemetry (ADOT) Lambda layer
@@ -101,7 +101,7 @@ The template is intentionally pinned to `us-east-1`, including the Node.js and P
 Choose one deployment entrypoint:
 
 - [Application Signals deployment configuration](deployments/appsignals/README.md)
-  This configuration defaults the account-level `AWS::ApplicationSignals::Discovery` resource off, so it can coexist with an account where Application Signals was already enabled by another stack.
+  This configuration assumes Application Signals has already been enabled in the target account and Region, and links to the AWS setup documentation.
 - [OTel deployment configuration](deployments/otel/README.md)
   This guide documents an important Lambda-specific OTLP detail: the optimized ADOT Lambda layers need `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, not just the generic OTLP endpoint variable, to avoid the Lambda UDP fallback path.
 
@@ -188,11 +188,11 @@ python3 scripts/check_adot_layers.py --template deployments/otel/template.yaml -
 
 ## Post-Deploy Smoke Test
 
-The smoke script submits one `ok`, one `slow`, and one `fail` job, then verifies:
+By default, the smoke script submits one `ok`, one `slow`, and one `fail` job, then verifies:
 
 - `ok` reaches `COMPLETED`
 - `slow` reaches `COMPLETED`
-- both successful jobs have artifacts in S3
+- successful jobs have artifacts in S3 and `artifactIndexedAt`, so the S3-triggered indexer path has completed
 - `fail` reaches `FAILED`
 - the worker DLQ depth increases
 
@@ -201,14 +201,17 @@ The handlers also emit demo-specific span events such as `demo.job.enqueued`, `d
 Run it with:
 
 ```bash
-./scripts/smoke-test.sh <stack-name> [aws-region]
+./scripts/smoke-test.sh <stack-name> [aws-region] [--count N] [--modes ok,slow,fail]
 ```
+
+`--count` applies per mode. For example, `--modes ok --count 100` submits 100 successful jobs.
 
 Examples:
 
 ```bash
 ./scripts/smoke-test.sh adot-serverless-demo-appsignals
 ./scripts/smoke-test.sh adot-serverless-demo-otel
+./scripts/smoke-test.sh adot-serverless-demo-appsignals us-east-1 --modes ok --count 100
 ```
 
 ## Cleanup

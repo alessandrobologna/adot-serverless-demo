@@ -6,17 +6,6 @@ Description: >
   and S3.
 
 Parameters:
-  ManageApplicationSignalsDiscovery:
-    Type: String
-    Default: "false"
-    AllowedValues:
-      - "true"
-      - "false"
-    Description: >
-      Set to true only when this stack should create the account-level
-      AWS::ApplicationSignals::Discovery resource. Leave false if Application
-      Signals is already enabled in this account and Region or managed by
-      another stack.
   SlowModeDelaySeconds:
     Type: Number
     Default: 6
@@ -32,11 +21,6 @@ Parameters:
     Default: arn:aws:lambda:us-east-1:615299751070:layer:AWSOpenTelemetryDistroPython:24
     Description: ADOT Lambda layer ARN for the Python functions.
 
-Conditions:
-  CreateApplicationSignalsDiscovery: !Equals
-    - !Ref ManageApplicationSignalsDiscovery
-    - "true"
-
 Globals:
   Function:
     Architectures:
@@ -50,10 +34,6 @@ Globals:
         JOBS_TABLE_NAME: !Ref JobsTable
 
 Resources:
-  ApplicationSignalsDiscovery:
-    Type: AWS::ApplicationSignals::Discovery
-    Condition: CreateApplicationSignalsDiscovery
-
   DemoHttpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
@@ -116,7 +96,7 @@ Resources:
       Runtime: nodejs22.x
       Environment:
         Variables:
-          OTEL_SERVICE_NAME: demo-api
+          OTEL_SERVICE_NAME: !Sub "${AWS::StackName}-submit-job"
           WORK_QUEUE_URL: !Ref WorkQueue
       Policies:
         - AWSLambdaBasicExecutionRole
@@ -145,7 +125,7 @@ Resources:
       Runtime: nodejs22.x
       Environment:
         Variables:
-          OTEL_SERVICE_NAME: demo-api
+          OTEL_SERVICE_NAME: !Sub "${AWS::StackName}-get-job"
       Policies:
         - AWSLambdaBasicExecutionRole
         - AWSXRayDaemonWriteAccess
@@ -174,7 +154,7 @@ Resources:
         Variables:
           ARTIFACTS_BUCKET_NAME: !Sub "${AWS::StackName}-artifacts"
           DEMO_SLOW_DELAY_SECONDS: !Ref SlowModeDelaySeconds
-          OTEL_SERVICE_NAME: demo-worker
+          OTEL_SERVICE_NAME: !Sub "${AWS::StackName}-process-job"
       Policies:
         - AWSLambdaBasicExecutionRole
         - AWSXRayDaemonWriteAccess
@@ -201,7 +181,7 @@ Resources:
       Runtime: python3.13
       Environment:
         Variables:
-          OTEL_SERVICE_NAME: demo-indexer
+          OTEL_SERVICE_NAME: !Sub "${AWS::StackName}-index-artifact"
       Policies:
         - AWSLambdaBasicExecutionRole
         - AWSXRayDaemonWriteAccess

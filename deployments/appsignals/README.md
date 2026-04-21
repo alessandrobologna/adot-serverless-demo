@@ -4,7 +4,6 @@ This deployment configuration uses CloudWatch Application Signals as the backend
 
 It keeps the current observability wiring:
 
-- optional `AWS::ApplicationSignals::Discovery`
 - `AWS_LAMBDA_EXEC_WRAPPER=/opt/otel-instrument`
 - `Tracing: Active`
 - `AWSXRayDaemonWriteAccess`
@@ -30,32 +29,24 @@ Committed defaults:
 - stack name: `adot-serverless-demo-appsignals`
 - region: `us-east-1`
 - ADOT layer ARNs for Node.js 22 and Python 3.13
-- `ManageApplicationSignalsDiscovery=false`
 - `SlowModeDelaySeconds=6`
 
-## Account-Level Discovery
+## Before You Deploy
 
-`AWS::ApplicationSignals::Discovery` is an account-level setup resource. If Application Signals is already enabled in this account and Region, attempting to create it again from this stack will fail with an `already exists in stack` error.
+This stack does not create the account-level Application Signals discovery resource.
 
-This deployment configuration therefore defaults `ManageApplicationSignalsDiscovery` to `false`.
+Enable Application Signals for Lambda in this account and Region before you deploy this stack. AWS documents that one-time setup here:
 
-Use `ManageApplicationSignalsDiscovery=true` only when this stack should perform the one-time account enablement step itself.
+- [Enable your applications on Lambda](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Application-Signals-Enable-LambdaMain.html)
+- [AWS::ApplicationSignals::Discovery](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-applicationsignals-discovery.html)
 
-Examples:
-
-```bash
-sam deploy -t template.yaml \
-  --config-file samconfig.toml \
-  --guided
-```
-
-During the guided deploy, change `ManageApplicationSignalsDiscovery` to `true` only if the account does not already have an `AWS::ApplicationSignals::Discovery` resource in this Region.
+If you prefer infrastructure as code for that one-time enablement step, deploy `AWS::ApplicationSignals::Discovery` separately from this demo stack so it is not coupled to the app lifecycle.
 
 ## What to Expect
 
 After deployment and the first few invocations:
 
-- CloudWatch Application Signals should discover `demo-api`, `demo-worker`, and `demo-indexer`
+- CloudWatch Application Signals should discover four function-scoped services named after the Lambda functions, such as `adot-serverless-demo-appsignals-submit-job` and `adot-serverless-demo-appsignals-process-job`
 - X-Ray service traces should show the API, SQS worker, and downstream dependencies
 - trace details should include demo-specific span events for queueing, processing, artifact writes, and indexing
 - the shared smoke test should work without changes
@@ -64,7 +55,7 @@ Application Signals may take up to about 10 minutes to populate dashboards after
 
 ## AWS-Specific Notes
 
-- If this account has never used Application Signals for Lambda, complete the one-time service discovery setup.
+- If this account has never used Application Signals for Lambda, complete the one-time enablement step before deploying this stack.
 - Remove any custom X-Ray SDK instrumentation from the Lambda code if it conflicts with the ADOT layer.
 - Keep the stack name lowercase and reasonably short because the stack creates explicit S3 bucket and Lambda function names.
 
@@ -76,8 +67,15 @@ Run the shared smoke test with this deployment configuration's stack name:
 ./scripts/smoke-test.sh adot-serverless-demo-appsignals
 ```
 
+To generate a larger set of successful traces while still verifying the full API -> SQS -> S3 -> indexer path:
+
+```bash
+./scripts/smoke-test.sh adot-serverless-demo-appsignals us-east-1 --modes ok --count 100
+```
+
 ## References
 
 - [Enable your applications on Lambda](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Application-Signals-Enable-LambdaMain.html)
 - [Monitor application performance with Amazon CloudWatch Application Signals](https://docs.aws.amazon.com/lambda/latest/dg/monitoring-application-signals.html)
+- [AWS::ApplicationSignals::Discovery](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-applicationsignals-discovery.html)
 - [Visualize Lambda function invocations using AWS X-Ray](https://docs.aws.amazon.com/lambda/latest/dg/services-xray.html)
