@@ -83,13 +83,16 @@ architecture-beta
 
 </details>
 
-Each Lambda function is instrumented with ADOT and sends telemetry to CloudWatch Application Signals through:
+Each Lambda function is instrumented with ADOT. Both deployment configurations share:
+
+- the runtime-specific AWS Distro for OpenTelemetry (ADOT) Lambda layer
+- `AWS_LAMBDA_EXEC_WRAPPER=/opt/otel-instrument`
+
+The `appsignals` deployment additionally uses:
 
 - a one-time Application Signals enablement step in the target account and Region
 - `CloudWatchLambdaApplicationSignalsExecutionRolePolicy`
 - `AWSXRayDaemonWriteAccess`
-- The runtime-specific AWS Distro for OpenTelemetry (ADOT) Lambda layer
-- `AWS_LAMBDA_EXEC_WRAPPER=/opt/otel-instrument`
 
 The template is intentionally pinned to `us-east-1`, including the Node.js and Python ADOT layer ARNs.
 

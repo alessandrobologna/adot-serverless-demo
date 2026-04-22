@@ -34,8 +34,6 @@ COUNT=1
 MODES_CSV="ok,slow,fail"
 AWS_REGION_SET="false"
 
-require_python_312
-
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --count)
@@ -116,6 +114,8 @@ for mode in "${REQUESTED_MODES[@]}"; do
 done
 
 REQUESTED_MODES=("${VALIDATED_MODES[@]}")
+
+require_python_312
 
 stack_output() {
   local key="$1"
