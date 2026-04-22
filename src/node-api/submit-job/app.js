@@ -1,6 +1,7 @@
 "use strict";
 
 const crypto = require("node:crypto");
+const { trace } = require("@opentelemetry/api");
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const { SQSClient, SendMessageCommand } = require("@aws-sdk/client-sqs");
 const {
@@ -13,6 +14,13 @@ const ddbClient = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
 });
 const sqsClient = new SQSClient({});
 const allowedModes = new Set(["ok", "slow", "fail"]);
+
+function addSpanEvent(name, attributes = {}) {
+  const span = trace.getActiveSpan();
+  if (span) {
+    span.addEvent(name, attributes);
+  }
+}
 
 function response(statusCode, body) {
   return {
@@ -42,6 +50,7 @@ exports.handler = async (event) => {
   try {
     payload = parseBody(event);
   } catch (error) {
+    addSpanEvent("demo.job.request.invalid_json");
     return response(400, {
       message: "Request body must be valid JSON.",
     });
@@ -49,6 +58,9 @@ exports.handler = async (event) => {
 
   const mode = payload.mode ?? "ok";
   if (!allowedModes.has(mode)) {
+    addSpanEvent("demo.job.request.invalid_mode", {
+      mode: String(mode),
+    });
     return response(400, {
       message: "mode must be one of: ok, slow, fail",
     });
@@ -56,6 +68,7 @@ exports.handler = async (event) => {
 
   const workQueueUrl = process.env.WORK_QUEUE_URL;
   if (!workQueueUrl) {
+    addSpanEvent("demo.job.request.misconfigured_queue");
     throw new Error("WORK_QUEUE_URL is required.");
   }
 
@@ -75,6 +88,12 @@ exports.handler = async (event) => {
     updatedAt: now,
   };
 
+  addSpanEvent("demo.job.request.accepted", {
+    jobId,
+    mode,
+    status: item.status,
+  });
+
   await ddbClient.send(
     new PutCommand({
       TableName: process.env.JOBS_TABLE_NAME,
@@ -82,6 +101,12 @@ exports.handler = async (event) => {
       ConditionExpression: "attribute_not_exists(jobId)",
     }),
   );
+
+  addSpanEvent("demo.job.persisted", {
+    jobId,
+    mode,
+    status: item.status,
+  });
 
   await sqsClient.send(
     new SendMessageCommand({
@@ -93,6 +118,11 @@ exports.handler = async (event) => {
       }),
     }),
   );
+
+  addSpanEvent("demo.job.enqueued", {
+    jobId,
+    mode,
+  });
 
   return response(202, {
     jobId,

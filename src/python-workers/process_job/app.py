@@ -5,6 +5,11 @@ from datetime import datetime, timezone
 
 import boto3
 
+try:
+    from opentelemetry import trace
+except ImportError:
+    trace = None
+
 
 TABLE = boto3.resource("dynamodb").Table(os.environ["JOBS_TABLE_NAME"])
 S3_CLIENT = boto3.client("s3")
@@ -12,6 +17,13 @@ S3_CLIENT = boto3.client("s3")
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def add_span_event(name: str, attributes: dict | None = None) -> None:
+    if trace is None:
+        return
+
+    trace.get_current_span().add_event(name, attributes or {})
 
 
 def handler(event, _context):
@@ -23,6 +35,14 @@ def handler(event, _context):
         mode = message.get("mode", "ok")
         current_time = now_iso()
 
+        add_span_event(
+            "demo.job.received",
+            {
+                "jobId": job_id,
+                "mode": mode,
+            },
+        )
+
         TABLE.update_item(
             Key={"jobId": job_id},
             UpdateExpression="SET #status = :status, updatedAt = :updatedAt REMOVE errorMessage",
@@ -33,11 +53,36 @@ def handler(event, _context):
             },
         )
 
+        add_span_event(
+            "demo.job.processing.started",
+            {
+                "jobId": job_id,
+                "mode": mode,
+                "status": "PROCESSING",
+            },
+        )
+
         if mode == "slow":
-            time.sleep(int(os.environ.get("DEMO_SLOW_DELAY_SECONDS", "6")))
+            delay_seconds = int(os.environ.get("DEMO_SLOW_DELAY_SECONDS", "6"))
+            add_span_event(
+                "demo.job.delay.applied",
+                {
+                    "jobId": job_id,
+                    "delaySeconds": delay_seconds,
+                },
+            )
+            time.sleep(delay_seconds)
 
         if mode == "fail":
             error_message = "Simulated worker failure triggered by mode=fail."
+            add_span_event(
+                "demo.job.failure.simulated",
+                {
+                    "jobId": job_id,
+                    "mode": mode,
+                    "errorMessage": error_message,
+                },
+            )
             TABLE.update_item(
                 Key={"jobId": job_id},
                 UpdateExpression=(
@@ -67,6 +112,15 @@ def handler(event, _context):
             ContentType="application/json",
         )
 
+        add_span_event(
+            "demo.artifact.written",
+            {
+                "artifactKey": artifact_key,
+                "bucket": os.environ["ARTIFACTS_BUCKET_NAME"],
+                "jobId": job_id,
+            },
+        )
+
         TABLE.update_item(
             Key={"jobId": job_id},
             UpdateExpression=(
@@ -77,6 +131,15 @@ def handler(event, _context):
                 ":status": "COMPLETED",
                 ":artifactKey": artifact_key,
                 ":updatedAt": now_iso(),
+            },
+        )
+
+        add_span_event(
+            "demo.job.processing.completed",
+            {
+                "artifactKey": artifact_key,
+                "jobId": job_id,
+                "status": "COMPLETED",
             },
         )
 

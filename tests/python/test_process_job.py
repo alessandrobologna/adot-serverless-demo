@@ -31,6 +31,14 @@ class FakeS3Client:
         return {}
 
 
+class FakeSpan:
+    def __init__(self):
+        self.events = []
+
+    def add_event(self, name, attributes):
+        self.events.append({"name": name, "attributes": attributes})
+
+
 def load_process_job_module():
     fake_table = FakeTable()
     fake_s3 = FakeS3Client()
@@ -61,6 +69,8 @@ def load_process_job_module():
 class ProcessJobTests(unittest.TestCase):
     def test_ok_mode_writes_artifact_and_completes_job(self):
         module, table, s3_client = load_process_job_module()
+        span = FakeSpan()
+        module.trace = types.SimpleNamespace(get_current_span=lambda: span)
 
         result = module.handler(
             {
@@ -81,9 +91,20 @@ class ProcessJobTests(unittest.TestCase):
         self.assertEqual(s3_client.puts[0]["Key"], "artifacts/job-ok.json")
         self.assertEqual(table.updates[0]["ExpressionAttributeValues"][":status"], "PROCESSING")
         self.assertEqual(table.updates[-1]["ExpressionAttributeValues"][":status"], "COMPLETED")
+        self.assertEqual(
+            [event["name"] for event in span.events],
+            [
+                "demo.job.received",
+                "demo.job.processing.started",
+                "demo.artifact.written",
+                "demo.job.processing.completed",
+            ],
+        )
 
     def test_slow_mode_sleeps_before_writing_artifact(self):
         module, table, s3_client = load_process_job_module()
+        span = FakeSpan()
+        module.trace = types.SimpleNamespace(get_current_span=lambda: span)
 
         with patch.object(module.time, "sleep") as sleep_mock:
             module.handler(
@@ -102,9 +123,13 @@ class ProcessJobTests(unittest.TestCase):
         sleep_mock.assert_called_once_with(1)
         self.assertEqual(len(s3_client.puts), 1)
         self.assertEqual(table.updates[-1]["ExpressionAttributeValues"][":status"], "COMPLETED")
+        self.assertEqual(span.events[2]["name"], "demo.job.delay.applied")
+        self.assertEqual(span.events[2]["attributes"]["delaySeconds"], 1)
 
     def test_fail_mode_marks_job_failed_and_raises(self):
         module, table, s3_client = load_process_job_module()
+        span = FakeSpan()
+        module.trace = types.SimpleNamespace(get_current_span=lambda: span)
 
         with self.assertRaisesRegex(RuntimeError, "mode=fail"):
             module.handler(
@@ -122,6 +147,7 @@ class ProcessJobTests(unittest.TestCase):
 
         self.assertEqual(len(s3_client.puts), 0)
         self.assertEqual(table.updates[-1]["ExpressionAttributeValues"][":status"], "FAILED")
+        self.assertEqual(span.events[-1]["name"], "demo.job.failure.simulated")
 
 
 if __name__ == "__main__":

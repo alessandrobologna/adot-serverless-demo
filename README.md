@@ -1,18 +1,17 @@
 # ADOT Serverless Demo
 
-This repository contains a greenfield AWS SAM application that demonstrates CloudWatch Application Signals with four Lambda-backed flows instrumented by ADOT:
+This repository contains a greenfield AWS SAM application that demonstrates the same Lambda-based document pipeline with two explicit deployment configurations:
 
-- A public HTTP API in `nodejs22.x`
-- An SQS-driven worker in `python3.13`
-- An S3-triggered indexer in `python3.13`
-- Shared state in DynamoDB and generated artifacts in S3
+- `appsignals` uses CloudWatch Application Signals
+- `otel` uses a third-party OpenTelemetry backend over OTLP
 
-The demo is designed to deploy with:
+Both deployment configurations share:
 
-```bash
-sam build
-sam deploy --guided
-```
+- a public HTTP API in `nodejs22.x`
+- an SQS-driven worker in `python3.13`
+- an S3-triggered indexer in `python3.13`
+- shared state in DynamoDB and generated artifacts in S3
+- custom span events at the main demo milestones so individual traces are easier to inspect
 
 ## Relevant AWS Docs
 
@@ -84,55 +83,52 @@ architecture-beta
 
 </details>
 
-Each Lambda function is instrumented with ADOT and sends telemetry to CloudWatch Application Signals through:
+Each Lambda function is instrumented with ADOT. Both deployment configurations share:
 
-- `AWS::ApplicationSignals::Discovery`
+- the runtime-specific AWS Distro for OpenTelemetry (ADOT) Lambda layer
+- `AWS_LAMBDA_EXEC_WRAPPER=/opt/otel-instrument`
+
+The `appsignals` deployment additionally uses:
+
+- a one-time Application Signals enablement step in the target account and Region
 - `CloudWatchLambdaApplicationSignalsExecutionRolePolicy`
 - `AWSXRayDaemonWriteAccess`
-- The runtime-specific AWS Distro for OpenTelemetry (ADOT) Lambda layer
-- `AWS_LAMBDA_EXEC_WRAPPER=/opt/otel-instrument`
 
 The template is intentionally pinned to `us-east-1`, including the Node.js and Python ADOT layer ARNs.
 
 > [!NOTE]
 > As of March 7, 2026, the ADOT Python Lambda layer docs list support through Python 3.13, and the Lambda Application Signals runtime list also stops at Python 3.13. `python3.14` is not yet supported by the ADOT Python Lambda layer for this integration, so this demo pins the Python functions to `python3.13`.
 
+## Deployment Configurations
+
+Choose one deployment entrypoint:
+
+- [Application Signals deployment configuration](deployments/appsignals/README.md)
+  This configuration assumes Application Signals has already been enabled in the target account and Region, and links to the AWS setup documentation.
+- [OTel deployment configuration](deployments/otel/README.md)
+  This guide documents an important Lambda-specific OTLP detail: the optimized ADOT Lambda layers need `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, not just the generic OTLP endpoint variable, to avoid the Lambda UDP fallback path.
+
+Canonical commands:
+
+```bash
+cd deployments/appsignals
+sam build -t template.yaml --config-file samconfig.toml
+sam deploy -t template.yaml --config-file samconfig.toml --guided
+```
+
+```bash
+cd deployments/otel
+sam build -t template.yaml --config-file samconfig.toml
+sam deploy -t template.yaml --config-file samconfig.toml --guided
+```
+
 ## Prerequisites
 
 - AWS CLI configured with credentials
 - AWS SAM CLI 1.154.0 or newer
 - Node.js 22 or newer with npm
-- Python 3 for local tests and smoke scripts
+- Python 3.12 or newer for local tests, smoke scripts, and helper scripts
 - `curl`
-
-## Deploy
-
-Run the build first:
-
-```bash
-sam build
-```
-
-Then deploy interactively:
-
-```bash
-sam deploy --guided
-```
-
-This repository commits `samconfig.toml` with `us-east-1`, the current ADOT layer ARNs, and a default stack name of `adot-serverless-demo`. You can accept those defaults or change them during the guided deploy.
-
-Recommended guided answers:
-
-- Stack Name: use a lowercase name, for example `adot-serverless-demo`
-- AWS Region: `us-east-1`
-- Confirm changes before deploy: `Y` or `N`, your preference
-- Allow SAM CLI IAM role creation: `Y`
-- Disable rollback: `N`
-- Save arguments to configuration file: `Y`
-
-After the stack deploys, wait for the outputs and note the `ApiBaseUrl`.
-
-Because the stack now uses explicit names such as `${AWS::StackName}-artifacts`, keep the stack name lowercase and reasonably short. This is required by the S3 bucket naming rules and helps avoid Lambda function name length issues.
 
 ## Local Verification
 
@@ -142,6 +138,12 @@ Run the unit tests:
 make test
 ```
 
+Equivalent `just` command:
+
+```bash
+just test
+```
+
 > [!NOTE]
 > `src/node-api/package-lock.json` is intentionally not committed. This repository is a demo/reference for the SAM architecture and ADOT/Application Signals wiring, not a pinned production dependency baseline.
 
@@ -149,7 +151,7 @@ You can also inspect sample invoke payloads in [`events/http-submit-ok.json`](ev
 
 ## ADOT Layer Maintenance
 
-AWS Lambda layer references are versioned ARNs, so SAM still needs exact ADOT layer versions somewhere in configuration. This repo defines `NodeAdotLayerArn` and `PythonAdotLayerArn` as template parameters, keeps fallback defaults in `template.yaml` so a fresh clone can still build, and stores the active local overrides in `samconfig.toml` for deploys.
+AWS Lambda layer references are versioned ARNs, so both deployment configurations pin exact ADOT layer versions in their own templates and configs.
 
 There is no native SAM property for "latest ADOT layer version", so this repo provides a script to check for drift against the latest official AWS Observability release metadata for the `AWSOpenTelemetryDistro*` layers.
 
@@ -159,57 +161,61 @@ Check whether a newer ADOT layer version has been published in `us-east-1`:
 make check-adot-layers
 ```
 
-Update `template.yaml` defaults and local `samconfig.toml` overrides to the latest published ADOT layer versions for the region:
+Equivalent `just` command:
+
+```bash
+just check-adot-layers
+```
+
+Update both deployment configuration templates and their local `samconfig.toml` overrides to the latest published ADOT layer versions for the region:
 
 ```bash
 make update-adot-layers
 ```
 
-The underlying script also supports explicit flags:
+Equivalent `just` command:
 
 ```bash
-python3 scripts/check_adot_layers.py --region us-east-1 --fail-on-drift
-python3 scripts/check_adot_layers.py --region us-east-1 --write-files
+just update-adot-layers
+```
+
+The underlying script also supports explicit flags for each deployment configuration:
+
+- `--fail-on-drift` checks the pinned layer ARNs and exits non-zero when either deployment configuration is behind the latest published ADOT layer version. This is the useful mode for CI or local verification.
+- `--write-files` rewrites the target template and matching `samconfig.toml` to the latest published ADOT layer ARNs for the requested region.
+
+```bash
+python3 scripts/check_adot_layers.py --template deployments/appsignals/template.yaml --samconfig deployments/appsignals/samconfig.toml --region us-east-1 --fail-on-drift
+python3 scripts/check_adot_layers.py --template deployments/otel/template.yaml --samconfig deployments/otel/samconfig.toml --region us-east-1 --write-files
 ```
 
 ## Post-Deploy Smoke Test
 
-The smoke script submits one `ok`, one `slow`, and one `fail` job, then verifies:
+By default, the smoke script submits one `ok`, one `slow`, and one `fail` job, then verifies:
 
 - `ok` reaches `COMPLETED`
 - `slow` reaches `COMPLETED`
-- both successful jobs have artifacts in S3
+- successful jobs have artifacts in S3 and `artifactIndexedAt`, so the S3-triggered indexer path has completed
 - `fail` reaches `FAILED`
 - the worker DLQ depth increases
+
+The handlers also emit demo-specific span events such as `demo.job.enqueued`, `demo.job.processing.started`, `demo.artifact.written`, and `demo.artifact.indexed`, which makes it easier to verify the flow inside a single trace.
 
 Run it with:
 
 ```bash
-./scripts/smoke-test.sh <stack-name> [aws-region]
+./scripts/smoke-test.sh <stack-name> [aws-region] [--count N] [--modes ok,slow,fail]
 ```
 
-Example:
+`--count` applies per mode. For example, `--modes ok --count 100` submits 100 successful jobs.
+
+Examples:
 
 ```bash
-./scripts/smoke-test.sh adot-serverless-demo
+./scripts/smoke-test.sh adot-serverless-demo-appsignals
+./scripts/smoke-test.sh adot-serverless-demo-otel
+./scripts/smoke-test.sh adot-serverless-demo-appsignals us-east-1 --modes ok --count 100
 ```
-
-## What to Look For in CloudWatch
-
-After you invoke the deployed functions, Application Signals can take several minutes to discover the services and populate dashboards.
-
-Look for these service names:
-
-- `demo-api`
-- `demo-worker`
-- `demo-indexer`
-
-Expected observations:
-
-- `demo-api` shows incoming HTTP request rate, latency, and faults
-- `demo-worker` shows async processing latency and fail-path faults
-- `demo-indexer` appears as the S3-driven follow-on service
-- X-Ray traces show the HTTP path, the SQS-linked worker path, and downstream DynamoDB/S3 dependencies
 
 ## Cleanup
 
