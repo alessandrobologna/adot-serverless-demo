@@ -24,6 +24,12 @@ Both deployment configurations share:
 
 ## Architecture
 
+The demo flows through three phases: request intake, worker processing, and artifact indexing.
+
+### Request Intake
+
+The public API accepts the request, records the initial job state in DynamoDB, and enqueues background work in SQS.
+
 <div align="center">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./svgs/readme-1-dark.svg">
@@ -50,38 +56,117 @@ x-mermint:
     fillStyle: solid
 ---
 architecture-beta
-  group edge(aws:aws-api-gateway)[HTTP API]
-  service api(aws:aws-api-gateway)[Gateway] in edge
+  group api_group(aws:aws-api-gateway)[API]
+  service gateway(aws:aws-api-gateway)[Gateway] in api_group
 
-  group demo_api_group(aws:aws-lambda)[Demo API]
-  service demo_api(aws:aws-lambda)[Lambda] in demo_api_group
+  group submit_group(aws:aws-lambda)[Submit]
+  service submit(aws:aws-lambda)[Lambda] in submit_group
 
   group state(aws:dynamodb)[State]
   service jobs(aws:dynamodb)[Jobs] in state
-  service queue(aws:simple-queue-service)[Queue] in state
-  service dlq(aws:simple-queue-service)[DLQ] in state
 
-  group demo_worker_group(aws:aws-lambda)[Demo Worker]
-  service demo_worker(aws:aws-lambda)[Lambda] in demo_worker_group
+  group messaging(aws:simple-queue-service)[Messaging]
+  service queue(aws:simple-queue-service)[Queue] in messaging
+
+  gateway:R --> L:submit
+  submit:B --> T:jobs
+  submit:R --> L:queue
+```
+
+</details>
+
+### Worker Processing
+
+The worker consumes queue messages, updates job state, writes artifacts to S3, and sends failed messages to the DLQ.
+
+<div align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./svgs/readme-2-dark.svg">
+  <img src="./svgs/readme-2-light.svg" alt="Architecture diagram">
+</picture>
+</div>
+
+<details data-mermint-source="true">
+  <summary>Mermaid source</summary>
+
+```mermaid
+---
+config:
+  theme: base
+  look: handDrawn
+  themeVariables:
+    lineColor: "#7d8593"
+  architecture:
+    iconSize: 64
+    padding: 48
+    fontSize: 16
+x-mermint:
+  rough:
+    fillStyle: solid
+---
+architecture-beta
+  group messaging(aws:simple-queue-service)[Messaging]
+  service queue(aws:simple-queue-service)[Queue] in messaging
+  service dlq(aws:simple-queue-service)[DLQ] in messaging
+
+  group worker_group(aws:aws-lambda)[Worker]
+  service worker(aws:aws-lambda)[Lambda] in worker_group
+
+  group state(aws:dynamodb)[State]
+  service jobs(aws:dynamodb)[Jobs] in state
 
   group storage(aws:simple-storage-service)[Artifacts]
   service bucket(aws:simple-storage-service)[Bucket] in storage
 
-  group demo_indexer_group(aws:aws-lambda)[Demo Indexer]
-  service demo_indexer(aws:aws-lambda)[Lambda] in demo_indexer_group
-
-  api:R --> L:demo_api
-  demo_api:B --> T:jobs
-  demo_api:R --> L:queue
-
-  queue:R --> L:demo_worker
+  queue:R --> L:worker
   queue:B --> T:dlq
+  worker:B --> T:jobs
+  worker:R --> L:bucket
+```
 
-  demo_worker:L --> R:jobs
-  demo_worker:B --> T:bucket
+</details>
 
-  bucket:R --> L:demo_indexer
-  demo_indexer:L --> R:jobs
+### Artifact Indexing
+
+The indexer reacts to new S3 objects and writes the artifact metadata back to the shared jobs table.
+
+<div align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./svgs/readme-3-dark.svg">
+  <img src="./svgs/readme-3-light.svg" alt="Architecture diagram">
+</picture>
+</div>
+
+<details data-mermint-source="true">
+  <summary>Mermaid source</summary>
+
+```mermaid
+---
+config:
+  theme: base
+  look: handDrawn
+  themeVariables:
+    lineColor: "#7d8593"
+  architecture:
+    iconSize: 64
+    padding: 48
+    fontSize: 16
+x-mermint:
+  rough:
+    fillStyle: solid
+---
+architecture-beta
+  group storage(aws:simple-storage-service)[Artifacts]
+  service bucket(aws:simple-storage-service)[Bucket] in storage
+
+  group indexer_group(aws:aws-lambda)[Indexer]
+  service indexer(aws:aws-lambda)[Lambda] in indexer_group
+
+  group state(aws:dynamodb)[State]
+  service jobs(aws:dynamodb)[Jobs] in state
+
+  bucket:R --> L:indexer
+  indexer:B --> T:jobs
 ```
 
 </details>
