@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+require_python_312() {
+  python3 -c '
+import sys
+
+if sys.version_info < (3, 12):
+    raise SystemExit(
+        f"Python 3.12+ is required for local smoke tests; found {sys.version.split()[0]}"
+    )
+'
+}
+
 usage() {
   cat >&2 <<'EOF'
 usage: smoke-test.sh <stack-name> [aws-region] [--count N] [--modes ok,slow,fail]
@@ -22,6 +33,8 @@ AWS_REGION="us-east-1"
 COUNT=1
 MODES_CSV="ok,slow,fail"
 AWS_REGION_SET="false"
+
+require_python_312
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

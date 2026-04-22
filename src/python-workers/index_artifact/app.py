@@ -1,6 +1,5 @@
 import os
 from datetime import datetime, timezone
-from typing import Optional
 from urllib.parse import unquote_plus
 
 import boto3
@@ -19,7 +18,7 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def add_span_event(name: str, attributes: Optional[dict] = None) -> None:
+def add_span_event(name: str, attributes: dict | None = None) -> None:
     if trace is None:
         return
 

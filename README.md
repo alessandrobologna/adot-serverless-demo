@@ -124,7 +124,7 @@ sam deploy -t template.yaml --config-file samconfig.toml --guided
 - AWS CLI configured with credentials
 - AWS SAM CLI 1.154.0 or newer
 - Node.js 22 or newer with npm
-- Python 3 for local tests and smoke scripts
+- Python 3.12 or newer for local tests, smoke scripts, and helper scripts
 - `curl`
 
 ## Local Verification
