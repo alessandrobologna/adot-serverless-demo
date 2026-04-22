@@ -54,6 +54,7 @@ test("GET /jobs/{jobId} returns the stored item", async () => {
 });
 
 test("GET /jobs/{jobId} returns 404 when the item is missing", async () => {
+  process.env.JOBS_TABLE_NAME = "jobs-table";
   const events = [];
   mock.method(DynamoDBDocumentClient.prototype, "send", async () => ({ Item: null }));
   mock.method(trace, "getActiveSpan", () => ({

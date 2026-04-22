@@ -354,7 +354,7 @@ print_job_summary() {
   fi
 
   local first_job="$1"
-  local last_job="${!job_count}"
+  local last_job="${!#}"
   printf '  %s jobs:  %d %s (first %s, last %s)\n' "${label}" "${job_count}" "${outcome}" "${first_job}" "${last_job}"
 }
 
