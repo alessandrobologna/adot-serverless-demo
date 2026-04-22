@@ -27,7 +27,7 @@ Both deployment configurations share:
 <div align="center">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./svgs/readme-1-dark.svg">
-  <img src="./svgs/readme-1-light.svg" alt="Architecture diagram" height="417">
+  <img src="./svgs/readme-1-light.svg" alt="Architecture diagram">
 </picture>
 </div>
 
@@ -45,6 +45,9 @@ config:
     iconSize: 64
     padding: 48
     fontSize: 16
+x-mermint:
+  rough:
+    fillStyle: solid
 ---
 architecture-beta
   group edge(aws:aws-api-gateway)[HTTP API]
