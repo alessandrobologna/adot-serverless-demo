@@ -18,9 +18,11 @@ Both deployment configurations share:
 - [Enable your applications on Lambda](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Application-Signals-Enable-LambdaMain.html)
 - [Monitor application performance with Amazon CloudWatch Application Signals](https://docs.aws.amazon.com/lambda/latest/dg/monitoring-application-signals.html)
 - [AWS Distro for OpenTelemetry Lambda](https://aws-otel.github.io/docs/getting-started/lambda/)
-- [AWS Distro for OpenTelemetry Lambda Support For Python](https://aws-otel.github.io/docs/getting-started/lambda/lambda-python/)
-- [AWS Distro for OpenTelemetry Lambda Support For JavaScript](https://aws-otel.github.io/docs/getting-started/lambda/lambda-js/)
+- [Historical reference only: AWS Distro for OpenTelemetry Lambda Support For Python](https://aws-otel.github.io/docs/getting-started/lambda/lambda-python/)
+- [Historical reference only: AWS Distro for OpenTelemetry Lambda Support For JavaScript](https://aws-otel.github.io/docs/getting-started/lambda/lambda-js/)
 - [AWS::ApplicationSignals::Discovery](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-applicationsignals-discovery.html)
+
+The Python and JavaScript pages above are kept only as historical reference. They are marked as the legacy ADOT Lambda approach and describe the older collector-based path, which this demo does not use.
 
 ## Architecture
 
@@ -185,7 +187,7 @@ The `appsignals` deployment additionally uses:
 The template is intentionally pinned to `us-east-1`, including the Node.js and Python ADOT layer ARNs.
 
 > [!NOTE]
-> As of March 7, 2026, the ADOT Python Lambda layer docs list support through Python 3.13, and the Lambda Application Signals runtime list also stops at Python 3.13. `python3.14` is not yet supported by the ADOT Python Lambda layer for this integration, so this demo pins the Python functions to `python3.13`.
+> As of April 21, 2026, AWS Lambda itself supports `python3.14`, but the current ADOT Lambda docs and the Lambda Application Signals runtime list stop at Python 3.13. This demo therefore pins the Python functions to `python3.13`.
 
 ## Deployment Configurations
 
@@ -196,18 +198,20 @@ Choose one deployment entrypoint:
 - [OTel deployment configuration](deployments/otel/README.md)
   This guide documents an important Lambda-specific OTLP detail: the optimized ADOT Lambda layers need `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, not just the generic OTLP endpoint variable, to avoid the Lambda UDP fallback path.
 
+A default `samconfig.toml` is committed in each deployment directory to simplify the first deploy. Treat it as a starting point. Adjust it to match your stack names, Region, and parameter values when needed.
+
 Canonical commands:
 
 ```bash
 cd deployments/appsignals
-sam build -t template.yaml --config-file samconfig.toml
-sam deploy -t template.yaml --config-file samconfig.toml --guided
+sam build -t template.yaml
+sam deploy -t template.yaml
 ```
 
 ```bash
 cd deployments/otel
-sam build -t template.yaml --config-file samconfig.toml
-sam deploy -t template.yaml --config-file samconfig.toml --guided
+sam build -t template.yaml
+sam deploy -t template.yaml
 ```
 
 ## Prerequisites
@@ -234,6 +238,8 @@ just test
 
 > [!NOTE]
 > `src/node-api/package-lock.json` is intentionally not committed. This repository is a demo/reference for the SAM architecture and ADOT/Application Signals wiring, not a pinned production dependency baseline.
+>
+> On a fresh checkout, `make test` and `just test` install the Node.js test dependencies into `src/node-api/node_modules` without writing a lockfile.
 
 You can also inspect sample invoke payloads in [`events/http-submit-ok.json`](events/http-submit-ok.json), [`events/sqs-work.json`](events/sqs-work.json), and [`events/s3-artifact.json`](events/s3-artifact.json).
 

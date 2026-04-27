@@ -8,8 +8,8 @@ region = "us-east-1"
 capabilities = "CAPABILITY_IAM"
 parameter_overrides = [
     "SlowModeDelaySeconds=6",
-    "NodeAdotLayerArn=arn:aws:lambda:us-east-1:615299751070:layer:AWSOpenTelemetryDistroJs:12",
-    "PythonAdotLayerArn=arn:aws:lambda:us-east-1:615299751070:layer:AWSOpenTelemetryDistroPython:24",
+    "NodeAdotLayerArn=arn:aws:lambda:us-east-1:615299751070:layer:AWSOpenTelemetryDistroJs:13",
+    "PythonAdotLayerArn=arn:aws:lambda:us-east-1:615299751070:layer:AWSOpenTelemetryDistroPython:25",
     "OtelBackendSecretName=adot-serverless-demo-otel-backend",
     "OtelBackendConfigVersion=2026-03-19-1",
 ]
