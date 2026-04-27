@@ -4,6 +4,7 @@ appsignals_template := "deployments/appsignals/template.yaml"
 appsignals_config := "deployments/appsignals/samconfig.toml"
 otel_template := "deployments/otel/template.yaml"
 otel_config := "deployments/otel/samconfig.toml"
+node_api_dir := "src/node-api"
 aws_region := env_var_or_default("AWS_REGION", "us-east-1")
 stack_name_appsignals := env_var_or_default("STACK_NAME_APPSIGNALS", "adot-serverless-demo-appsignals")
 stack_name_otel := env_var_or_default("STACK_NAME_OTEL", "adot-serverless-demo-otel")
@@ -13,8 +14,11 @@ default:
 
 test: test-node test-python
 
-test-node:
-    npm test --prefix src/node-api
+install-node-deps:
+    npm install --prefix {{node_api_dir}} --no-package-lock --no-save
+
+test-node: install-node-deps
+    npm test --prefix {{node_api_dir}}
 
 test-python:
     python3 -m unittest discover -s tests/python -v

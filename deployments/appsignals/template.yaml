@@ -14,11 +14,11 @@ Parameters:
     Description: Delay used by the demo worker when a job is submitted with mode=slow.
   NodeAdotLayerArn:
     Type: String
-    Default: arn:aws:lambda:us-east-1:615299751070:layer:AWSOpenTelemetryDistroJs:12
+    Default: arn:aws:lambda:us-east-1:615299751070:layer:AWSOpenTelemetryDistroJs:13
     Description: ADOT Lambda layer ARN for the Node.js functions.
   PythonAdotLayerArn:
     Type: String
-    Default: arn:aws:lambda:us-east-1:615299751070:layer:AWSOpenTelemetryDistroPython:24
+    Default: arn:aws:lambda:us-east-1:615299751070:layer:AWSOpenTelemetryDistroPython:25
     Description: ADOT Lambda layer ARN for the Python functions.
 
 Globals:

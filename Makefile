@@ -1,4 +1,4 @@
-.PHONY: test test-node test-python require-python build-appsignals build-otel smoke smoke-appsignals smoke-otel \
+.PHONY: test install-node-deps test-node test-python require-python build-appsignals build-otel smoke smoke-appsignals smoke-otel \
 	check-adot-layers check-adot-layers-appsignals check-adot-layers-otel \
 	update-adot-layers update-adot-layers-appsignals update-adot-layers-otel
 
@@ -6,14 +6,18 @@ APPSIGNALS_TEMPLATE := deployments/appsignals/template.yaml
 APPSIGNALS_CONFIG := deployments/appsignals/samconfig.toml
 OTEL_TEMPLATE := deployments/otel/template.yaml
 OTEL_CONFIG := deployments/otel/samconfig.toml
+NODE_API_DIR := src/node-api
 AWS_REGION ?= us-east-1
 STACK_NAME_APPSIGNALS ?= adot-serverless-demo-appsignals
 STACK_NAME_OTEL ?= adot-serverless-demo-otel
 
 test: test-node test-python
 
-test-node:
-	npm test --prefix src/node-api
+install-node-deps:
+	npm install --prefix $(NODE_API_DIR) --no-package-lock --no-save
+
+test-node: install-node-deps
+	npm test --prefix $(NODE_API_DIR)
 
 require-python:
 	@python3 -c 'import sys; version = sys.version_info[:3]; min_version = (3, 12, 0); sys.exit(f"Python 3.12+ is required for local repo commands; found {sys.version.split()[0]}") if version < min_version else None'

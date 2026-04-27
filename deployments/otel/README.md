@@ -36,13 +36,13 @@ The endpoint and headers values are resolved from an AWS Secrets Manager `Secret
 Build from this directory:
 
 ```bash
-sam build -t template.yaml --config-file samconfig.toml
+sam build -t template.yaml
 ```
 
-Deploy interactively:
+Deploy with the committed defaults:
 
 ```bash
-sam deploy -t template.yaml --config-file samconfig.toml --guided
+sam deploy -t template.yaml
 ```
 
 Committed defaults:
@@ -53,6 +53,8 @@ Committed defaults:
 - `SlowModeDelaySeconds=6`
 - backend secret name: `adot-serverless-demo-otel-backend`
 - backend config version: `2026-03-19-1`
+
+The committed `samconfig.toml` is a starting point. Edit it if you want different stack names, Regions, parameter values, or secret names.
 
 ## Required Configuration
 
@@ -98,17 +100,15 @@ aws secretsmanager put-secret-value \
   --region us-east-1
 ```
 
-Then either keep the committed secret name or override `OtelBackendSecretName` during `sam deploy --guided`.
+Then either keep the committed secret name or update `OtelBackendSecretName` in `samconfig.toml` before you deploy.
 
-Examples:
+Deploy with the current committed defaults:
 
 ```bash
-sam deploy -t template.yaml \
-  --config-file samconfig.toml \
-  --guided
+sam deploy -t template.yaml
 ```
 
-During the guided deploy, change `OtelBackendSecretName` if you want to use a different secret name or ARN.
+If you want to use a different secret name or ARN, update `OtelBackendSecretName` in `samconfig.toml` first.
 
 CloudFormation dynamic references can be used in resource properties, including Lambda environment variables, but AWS documents that the resolved value may still show up in the target service. In this deployment configuration, the secret is resolved into Lambda environment variables, so treat the function configuration as sensitive.
 
@@ -133,7 +133,7 @@ parameter_overrides = [
 Then run:
 
 ```bash
-sam deploy -t template.yaml --config-file samconfig.toml
+sam deploy -t template.yaml
 ```
 
 ## Expectations
