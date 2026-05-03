@@ -198,7 +198,7 @@ Choose one deployment entrypoint:
 - [OTel deployment configuration](deployments/otel/README.md)
   This guide documents an important Lambda-specific OTLP detail: the optimized ADOT Lambda layers need `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, not just the generic OTLP endpoint variable, to avoid the Lambda UDP fallback path.
 
-A default `samconfig.toml` is committed in each deployment directory to simplify the first deploy. Treat it as a starting point. Adjust it to match your stack names, Region, and parameter values when needed.
+A default `samconfig.toml` is committed in each deployment directory to simplify the first deploy. Treat it as a starting point. Adjust it to match your stack names, Region, and parameter values when needed. If you change Region, also update the pinned `NodeAdotLayerArn` and `PythonAdotLayerArn` values for that Region, or run `make update-adot-layers` or `just update-adot-layers`.
 
 Canonical commands:
 

@@ -54,7 +54,7 @@ Committed defaults:
 - backend secret name: `adot-serverless-demo-otel-backend`
 - backend config version: `2026-03-19-1`
 
-The committed `samconfig.toml` is a starting point. Edit it if you want different stack names, Regions, parameter values, or secret names.
+The committed `samconfig.toml` is a starting point. Edit it if you want different stack names, Regions, parameter values, or secret names. If you change Region, also update `NodeAdotLayerArn` and `PythonAdotLayerArn` for that Region, or run `make update-adot-layers` or `just update-adot-layers`.
 
 ## Required Configuration
 
@@ -123,8 +123,8 @@ For example, after changing the secret:
 ```toml
 parameter_overrides = [
     "SlowModeDelaySeconds=6",
-    "NodeAdotLayerArn=arn:aws:lambda:us-east-1:615299751070:layer:AWSOpenTelemetryDistroJs:12",
-    "PythonAdotLayerArn=arn:aws:lambda:us-east-1:615299751070:layer:AWSOpenTelemetryDistroPython:24",
+    "NodeAdotLayerArn=arn:aws:lambda:us-east-1:615299751070:layer:AWSOpenTelemetryDistroJs:13",
+    "PythonAdotLayerArn=arn:aws:lambda:us-east-1:615299751070:layer:AWSOpenTelemetryDistroPython:25",
     "OtelBackendSecretName=adot-serverless-demo-otel-backend",
     "OtelBackendConfigVersion=2026-03-19-2",
 ]
