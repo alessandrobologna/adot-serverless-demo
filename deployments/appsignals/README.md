@@ -15,13 +15,13 @@ It keeps the current observability wiring:
 Build from this directory:
 
 ```bash
-sam build -t template.yaml --config-file samconfig.toml
+sam build -t template.yaml
 ```
 
-Deploy interactively:
+Deploy with the committed defaults:
 
 ```bash
-sam deploy -t template.yaml --config-file samconfig.toml --guided
+sam deploy -t template.yaml
 ```
 
 Committed defaults:
@@ -30,6 +30,8 @@ Committed defaults:
 - region: `us-east-1`
 - ADOT layer ARNs for Node.js 22 and Python 3.13
 - `SlowModeDelaySeconds=6`
+
+The committed `samconfig.toml` is a starting point. Edit it if you want different stack names, Regions, or parameter values. If you change Region, also update `NodeAdotLayerArn` and `PythonAdotLayerArn` for that Region, or run `make update-adot-layers` or `just update-adot-layers`.
 
 ## Before You Deploy
 
