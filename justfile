@@ -15,7 +15,12 @@ default:
 test: test-node test-python
 
 install-node-deps:
-    npm install --prefix {{node_api_dir}} --no-package-lock --no-save
+    stamp="{{node_api_dir}}/node_modules/.install-stamp"; \
+    if [ ! -d "{{node_api_dir}}/node_modules" ] || [ ! -f "$stamp" ] || [ "{{node_api_dir}}/package.json" -nt "$stamp" ]; then \
+        npm install --prefix {{node_api_dir}} --no-package-lock --no-save; \
+        mkdir -p "{{node_api_dir}}/node_modules"; \
+        touch "$stamp"; \
+    fi
 
 test-node: install-node-deps
     npm test --prefix {{node_api_dir}}

@@ -7,14 +7,20 @@ APPSIGNALS_CONFIG := deployments/appsignals/samconfig.toml
 OTEL_TEMPLATE := deployments/otel/template.yaml
 OTEL_CONFIG := deployments/otel/samconfig.toml
 NODE_API_DIR := src/node-api
+NODE_API_PACKAGE_JSON := $(NODE_API_DIR)/package.json
+NODE_API_INSTALL_STAMP := $(NODE_API_DIR)/node_modules/.install-stamp
 AWS_REGION ?= us-east-1
 STACK_NAME_APPSIGNALS ?= adot-serverless-demo-appsignals
 STACK_NAME_OTEL ?= adot-serverless-demo-otel
 
 test: test-node test-python
 
-install-node-deps:
+install-node-deps: $(NODE_API_INSTALL_STAMP)
+
+$(NODE_API_INSTALL_STAMP): $(NODE_API_PACKAGE_JSON)
 	npm install --prefix $(NODE_API_DIR) --no-package-lock --no-save
+	@mkdir -p $(dir $@)
+	@touch $@
 
 test-node: install-node-deps
 	npm test --prefix $(NODE_API_DIR)
