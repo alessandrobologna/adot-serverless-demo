@@ -17,8 +17,8 @@ test: test-node test-python
 install-node-deps:
     stamp="{{node_api_dir}}/node_modules/.install-stamp"; \
     if [ ! -d "{{node_api_dir}}/node_modules" ] || [ ! -f "$stamp" ] || [ "{{node_api_dir}}/package.json" -nt "$stamp" ]; then \
-        npm install --prefix {{node_api_dir}} --no-package-lock --no-save; \
-        mkdir -p "{{node_api_dir}}/node_modules"; \
+        npm install --prefix {{node_api_dir}} --no-package-lock --no-save && \
+        mkdir -p "{{node_api_dir}}/node_modules" && \
         touch "$stamp"; \
     fi
 
